@@ -1,0 +1,55 @@
+{
+  "name": "voyager-craftworld-bot",
+  "version": "1.0.0",
+  "description": "Automated bot for Voyager CraftWorld daily tasks and chest spinning",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "voyager",
+    "craftworld",
+    "bot",
+    "automation",
+    "crypto",
+    "airdrop",
+    "web3",
+    "ethereum",
+    "siwe",
+    "gaming"
+  ],
+  "author": "Airdrop Insiders",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vikitoshi/Voyager-CraftWorld-Bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vikitoshi/Voyager-CraftWorld-Bot/issues"
+  },
+  "homepage": "https://github.com/vikitoshi/Voyager-CraftWorld-Bot#readme",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1",
+    "ethers": "^6.10.0",
+    "siwe": "^2.1.4",
+    "https-proxy-agent": "^7.0.2",
+    "http-proxy-agent": "^7.0.0",
+    "socks-proxy-agent": "^8.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "optionalDependencies": {},
+  "peerDependencies": {},
+  "funding": {
+    "type": "telegram",
+    "url": "https://t.me/AirdropInsiderID"
+  }
+}
