@@ -128,29 +128,39 @@ function parseProxy(proxyString) {
 
 function createProxyAgent(proxy) {
   try {
-    let proxyUrl;
-    
-    if (proxy.auth) {
-      proxyUrl = `${proxy.type}://${proxy.auth}@${proxy.host}:${proxy.port}`;
-    } else {
-      proxyUrl = `${proxy.type}://${proxy.host}:${proxy.port}`;
+    const { type, host, port, auth } = proxy;
+
+    // Default protocol if not specified
+    let protocol = type.includes('socks') ? `${type}:` : 'http:';
+
+    if (type === 'socks4' || type === 'socks5') {
+      return new SocksProxyAgent(`${protocol}//${auth ? auth + '@' : ''}${host}:${port}`);
     }
-    
-    switch (proxy.type) {
-      case 'socks4':
-      case 'socks5':
-        return new SocksProxyAgent(proxyUrl);
-      case 'https':
-        return new HttpsProxyAgent(proxyUrl);
-      case 'http':
-      default:
-        return new HttpProxyAgent(proxyUrl);
+
+    // HTTP(S) proxies need this format object for proper auth handling
+    const proxyOptions = {
+      host,
+      port,
+      protocol: protocol,
+    };
+
+    if (auth) {
+      const [username, password] = auth.split(':');
+      proxyOptions.auth = `${username}:${password}`;
+    }
+
+    if (type === 'https') {
+      return new HttpsProxyAgent(proxyOptions);
+    } else {
+      return new HttpProxyAgent(proxyOptions);
     }
   } catch (error) {
     logger.error(`Failed to create proxy agent for ${proxy.original}: ${error.message}`);
     return null;
   }
 }
+
+
 
 async function testProxy(proxy, timeout = 10000) {
   try {
