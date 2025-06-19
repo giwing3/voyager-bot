@@ -4,7 +4,7 @@ on:
   schedule:
     # Menjalankan setiap hari pada pukul 00:00 UTC (07:00 pagi WIB)
     - cron: '0 0 * * *'
-
+  
   workflow_dispatch: # Memungkinkan menjalankan manual
 
 jobs:
@@ -23,18 +23,40 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
+      - name: Siapkan File Data (wallets.txt, proxies.txt) dari Secrets
+        env:
+          # Pastikan Secrets ini sudah kamu tambahkan di GitHub Secrets repo kamu!
+          # PRIVATE_KEYS: Kunci privat kamu, dipisahkan KOMA (,) jika banyak.
+          # Contoh Value: 0x123...,0x456...
+          PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }}
+          # PROXIES_DATA: Daftar proxy, setiap proxy di BARIS BARU.
+          # Contoh Value (di GitHub Secrets, tekan Enter untuk baris baru):
+          #   http://user:pass@ip1:port1
+          #   socks5://user:pass@ip2:port2
+          PROXIES_DATA: ${{ secrets.PROXIES_DATA }}
+          
+        run: |
+          echo "${{ secrets.PROXIES_DATA }}" > proxies.txt
+          # Logika untuk private keys akan langsung dari PRIVATE_KEYS ENV var di skrip
+          
+          # Catatan: Skrip ini membaca PRIVATE_KEYS dari ENV, tapi proxies dari file proxies.txt
+          # Jadi kita perlu membuat file proxies.txt di sini dari Secret.
+
       - name: Jalankan Voyager Bot dengan Environment Variables dari Secrets
         env:
-          PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }}
+          # PRIVATE_KEYS sudah diset di langkah sebelumnya, tapi kita bisa deklarasikan ulang untuk kejelasan
+          PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }} 
           RPC_URL: ${{ secrets.RPC_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-          # Optional secrets, skrip akan mencoba membacanya jika ada
-          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
+          # VOYAGER_API_KEY: Opsional, skrip akan mencoba membacanya.
+          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }} 
+          # FIREBASE_API_KEY: Opsional, skrip akan mencoba membacanya atau pakai hardcode.
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          # DISCORD_WEBHOOK_URL: Jika kamu punya dan ingin notifikasi Discord.
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
-          # --- BARIS PROXIES_DATA, PROXY_USER, PROXY_PASS DIHAPUS DARI SINI ---
+          # PROXIES_DATA tidak perlu lagi diset di sini karena sudah dipakai untuk membuat file proxies.txt
+          # PROXY_USER, PROXY_PASS juga tidak perlu karena proxy di handle di proxies.txt
 
         run: node index.js
