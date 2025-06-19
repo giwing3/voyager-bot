@@ -1,0 +1,18 @@
+# Log files
+*.log
+npm-debug.log*
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Environment variables
+.env
+
+# Sensitive data files
+wallets.txt
+proxies.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
