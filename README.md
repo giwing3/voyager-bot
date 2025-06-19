@@ -15,11 +15,11 @@ This bot automatically handles daily login, quest claiming, and chest spinning f
 
 ### 1. Register Your Account
 First, create your Voyager CraftWorld account :
-👉 **[Register Here](https://voyager.preview.craft-world.gg?code=f4d376)**
+
 
 ### 2. Join Our Community
 Stay updated with the latest airdrops and updates:
-🔗 **[Join Airdrop Insiders Telegram](https://t.me/AirdropInsiderID)**
+🔗 **[Join Airdrop Insiders Telegram](https://t.me/Airdropoe)**
 
 ## 🛠️ Installation
 
@@ -29,7 +29,7 @@ Stay updated with the latest airdrops and updates:
 
 ### Clone the Repository
 ```bash
-git clone https://github.com/vikitoshi/Voyager-CraftWorld-Bot.git
+git clone 
 cd Voyager-CraftWorld-Bot
 ```
 
@@ -169,8 +169,6 @@ This project is for educational purposes. Use at your own risk.
 
 ## 📞 Support
 
-- **Telegram Channel**: [@AirdropInsiderID](https://t.me/AirdropInsiderID)
-- **GitHub Issues**: [Create an issue](https://github.com/vikitoshi/Voyager-CraftWorld-Bot/issues)
 
 ## 🎉 Credits
 
@@ -180,5 +178,4 @@ Developed by **Airdrop Insiders** team for the community.
 
 ⭐ **Don't forget to star this repository if it helped you!**
 
-🔗 **Register Voyager**: https://voyager.preview.craft-world.gg?code=f4d376  
-📱 **Join Telegram**: https://t.me/AirdropInsiderID
+📱 **Join Telegram**: https://t.me/Airdropoe
