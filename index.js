@@ -1,12 +1,13 @@
-// index.js (Versi Final Revisi Lengkap: 1x Run & Notifikasi Telegram)
+// index.js (Versi Final Revisi Lengkap: 1x Run & Notifikasi Telegram, TANPA PROXY)
 
 require('dotenv').config(); // Berguna untuk environment variables lokal (tidak di-commit ke Git)
 const axios = require('axios');
 const { ethers } = require('ethers');
 const { SiweMessage } = require('siwe');
-const { HttpsProxyAgent } = require('https-proxy-agent');
-const { HttpProxyAgent } = require('http-proxy-agent');
-const { SocksProxyAgent } = require('socks-proxy-agent');
+// Hapus import proxy agents karena tidak akan digunakan
+// const { HttpsProxyAgent } = require('https-proxy-agent');
+// const { HttpProxyAgent } = require('http-proxy-agent');
+// const { SocksProxyAgent } = require('socks-proxy-agent');
 // fs dan path tidak lagi dibutuhkan karena tidak membaca file lokal
 // const fs = require('fs');
 // const path = require('path');
@@ -30,38 +31,7 @@ const logger = {
   success: (msg) => console.log(`${colors.green}[✅] ${msg}${colors.reset}`),
   loading: (msg) => console.log(`${colors.cyan}[⟳] ${msg}${colors.reset}`),
   step: (msg) => console.log(`${colors.blue}[➤] ${msg}${colors.reset}`),
-  // countdown dan banner tidak relevan untuk 1x run di GitHub Actions
-  // countdown: (msg) => process.stdout.write(`\r${colors.blue}[⏰] ${msg}${colors.reset}`),
-  // banner: () => {
-  //   console.log(`${colors.cyan}${colors.bold}`);
-  //   console.log(`---------------------------------------------`);
-  //   console.log(`  Voyager CW Auto Bot - Airdrop Insiders   `);
-  //   console.log(`---------------------------------------------${colors.reset}`);
-  //   console.log();
-  // }
 };
-
-const userAgents = [
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0",
-  "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0"
-];
-
-function getRandomUserAgent() {
-  return userAgents[Math.floor(Math.random() * userAgents.length)];
-}
 
 // Fungsi untuk mengirim notifikasi Telegram
 async function sendTelegramNotification(message) {
@@ -89,78 +59,13 @@ async function sendTelegramNotification(message) {
   }
 }
 
-// Fungsi untuk mendapatkan agent proxy dari string proxy
-function createProxyAgent(proxyString) {
-  if (!proxyString) return null;
+// Hapus atau abaikan fungsi createProxyAgent dan testProxy karena tidak pakai proxy
+// function createProxyAgent(proxyString) { /* ... */ }
+// async function testProxy(proxyString, timeout = 10000) { /* ... */ }
 
-  let protocolMatch = proxyString.match(/^(https?|socks[45]?):\/\//i);
-  let protocol = protocolMatch ? protocolMatch[1].toLowerCase() : 'http'; // Default to http if no protocol specified
 
-  let cleanProxy = proxyString.replace(/^(https?|socks[45]?):\/\//i, '');
-
-  let auth = null;
-  let hostPort = cleanProxy;
-
-  if (cleanProxy.includes('@')) {
-    const parts = cleanProxy.split('@');
-    auth = parts[0];
-    hostPort = parts[1];
-  }
-
-  const [host, port] = hostPort.split(':');
-
-  if (!host || !port) {
-    logger.warn(`Invalid proxy format: ${proxyString}. Skipping.`);
-    return null;
-  }
-
-  const agentOptions = {
-    host,
-    port: parseInt(port),
-  };
-
-  if (auth) {
-    const [username, password] = auth.split(':');
-    agentOptions.username = username;
-    agentOptions.password = password;
-  }
-
-  if (protocol.startsWith('socks')) {
-    // Note: socks-proxy-agent expects full URL including protocol and auth
-    return new SocksProxyAgent(`${protocol}://${auth ? auth + '@' : ''}${host}:${port}`);
-  } else if (protocol === 'https') {
-    // Note: https-proxy-agent expects full URL including protocol and auth
-    return new HttpsProxyAgent(`https://${auth ? auth + '@' : ''}${host}:${port}`);
-  } else {
-    // Note: http-proxy-agent expects full URL including protocol and auth
-    return new HttpProxyAgent(`http://${auth ? auth + '@' : ''}${host}:${port}`);
-  }
-}
-
-// Fungsi untuk menguji proxy
-async function testProxy(proxyString, timeout = 10000) {
-  try {
-    const agent = createProxyAgent(proxyString);
-    if (!agent) return false;
-
-    // Menggunakan httpbin.org untuk validasi IP eksternal
-    const response = await axios.get('https://httpbin.org/ip', {
-      httpsAgent: agent, // Gunakan httpsAgent untuk HTTPS test
-      httpAgent: agent,   // Gunakan httpAgent untuk HTTP test
-      timeout,
-      headers: { 'User-Agent': getRandomUserAgent() }
-    });
-
-    logger.success(`Proxy ${proxyString} is working. Origin IP: ${response.data.origin}`);
-    return true;
-  } catch (error) {
-    logger.error(`Proxy ${proxyString} failed: ${error.message}`);
-    return false;
-  }
-}
-
-// Fungsi untuk membuat konfigurasi Axios dengan atau tanpa proxy
-function createAxiosConfig(proxyString = null, additionalHeaders = {}) {
+// Fungsi untuk membuat konfigurasi Axios (tanpa proxy agent)
+function createAxiosConfig(proxyString = null, additionalHeaders = {}) { // Parameter proxyString tetap ada tapi akan diabaikan
   const config = {
     headers: {
       'User-Agent': getRandomUserAgent(),
@@ -169,20 +74,21 @@ function createAxiosConfig(proxyString = null, additionalHeaders = {}) {
     timeout: 30000 // Timeout default 30 detik
   };
 
-  if (proxyString) {
-    const agent = createProxyAgent(proxyString);
-    if (agent) {
-      config.httpsAgent = agent;
-      config.httpAgent = agent;
-    }
-  }
+  // Logika proxy dihilangkan di sini
+  // if (proxyString) {
+  //   const agent = createProxyAgent(proxyString);
+  //   if (agent) {
+  //     config.httpsAgent = agent;
+  //     config.httpAgent = agent;
+  //   }
+  // }
   return config;
 }
 
 // Catatan: appCheckToken ini terdeteksi hardcoded di skrip awal kamu.
 // Jika ini harus dynamic atau disembunyikan, sebaiknya dijadikan GitHub Secret juga.
 // Jika tidak diset sebagai ENV, dia akan menggunakan nilai hardcoded ini.
-const appCheckToken = process.env.FIREBASE_APP_CHECK_TOKEN || "eyJraWQiOiJrTFRMakEiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxOjU0MzEyMzE3NDQyOndlYjo1ODVmNjIzNTRkYjUzYzE0MmJlZDFiIiwiYXVkIjpbInByb2plY3RzXC81NDMxMjMxNzQ0MiIsInByb2plY3RzXC9nYW1lLXByZXZpZXctNTFjMmEiXSwicHJvdmlkZXIiOiJyZWNhcHRjaGFfdjMiLCJpc3MiOiJodHRwczpcL1wvZmlyZWJhc2VhcHBjaGVjay5nb29nbGVhcGlzLmNvbVwvNTQzMTIzMTc0NDIiLCJleHAiOjE3NTAwNTIyNDQsImlhdCI6MTc0OTk2NTg0NCwianRpIjoiUmFETTZUdUNqR2tLSEhFU05pa0xzLVJrdUxnRGJTbU1XeHF4N2xYZ0dNayJ9.AOfqTMnxe4v6Ze_yzB4MbZ1vatoRSMY0N3QoHDc4NV6fJVom9Re-XLbR7KA7njZicRtZu9sWUTTnAXlIePnkgP3SQXtx-28c9ze2O2waJMvUPqAeH4PSSck7KhD3YyggwfLzZgTlj2d7NdImGLdOhVZdVmWq-HSAUV95nLFvgSzEbi-SBO0PJqUWrTsq1_CSMnJtNQfKQ1g4_2jrhHvvupNpQFIg20z1-vm9u_Kal8LaZHrJdqkONRvk4SVPjkIdPzxng4vZ14PooF82SVsVq4WRJDPawzdPpDlSiMadJYKqwlNu-2JZL4jNPWJUtZEbQ8OD4-mgYsdAPUxysKSXck81RlIPuvUkaqHX5MbhSRtatjRRoJBedS-8oUfbcX-rYTesQdQ94gkz9--QuJD7U1-uR_GZxwlnfrVQT-DtbQTgBBq2Wh6TPSu8Hn7-XDefUsXFineIwSbBVSGlJbNm_TrjOJinbqNqYyOTiTtl6tfswpF3Zxrm0QzyVaL7TCAD";
+const appCheckToken = process.env.FIREBASE_APP_CHECK_TOKEN || "eyJraWQiOiJrTFRMakEiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxOjU0MzEyMzE3NDQyOndlYjo1ODVmNjIzNTRkYjUzYzE0MmJlZDFiIiwiYXVkIjpbInByb2plY3RzXC81NDMxMjMxNzQ0MiIsInByb2plY3RzXC9nYW1lLXprYWdlaW1lLXByZXZpZXctNTFjMmEiXSwicHJvdmlkZXIiOiJyZWNhcHRjaGFfdjMiLCJpc3MiOiJodHRwczpcL1wvZmlyZWJhc2VhcHBjaGVjay5nb29nbGVhcGlzLmNvbVwvNTQzMTIzMTc0NDIiLCJleHAiOjE3NTAwNTIyNDQsImlhdCI6MTc0OTk2NTg0NCwianRpIjoiUmFETTZUdUNqR2tLSEhFU05pa0xzLVJrdUxnRGJTbU1XeHF4N2xYZ0dNayJ9.AOfqTMnxe4v6Ze_yzB4MbZ1vatoRSMY0N3QoHDc4NV6fJVom9Re-XLbR7KA7njZicRtZu9sWUTTnAXIePnkgP3SQXtx-28c9ze2O2waJMvUPqAeH4PSSck7KhD3YyggwfLzZgTlj2d7NdImGLdOhVZdVmWq-HSAUV95nLFvgSzEbi-SBO0PJqUWrTsq1_CSMnJtNQfKQ1g4_2jrhHvvupNpQFIg20z1-vm9u_Kal8LaZHrJdqkONRvk4SVPjkIdPzxng4vZ14PooF82SVsVq4WRJDPawzdPpDlSiMadJYKqwlNu-2JZL4jNPWJUtZEbQ8OD4-mgYsdAPUxysKSXck81RlIPuvUkaqHX5MbhSRtatjRRoJBedS-8oUfbcX-rYTesQdQ94gkz9--QuJD7U1-uR_GZxwlnfrVQT-DtbQTgBBq2Wh6TPSu8Hn7-XDefUsXFineIwSbBVSGlJbNm_TrjOJinbqNqYyOTiTtl6tfswpF3Zxrm0QzyVaL7TCAD";
 
 const baseHeaders = {
   accept: "*/*",
@@ -391,6 +297,77 @@ async function spinChestIfAvailable(chestId, chestName, sessionCookie, chests, p
   return successfulSpins;
 }
 
+async function claimAllReadyQuests(sessionCookie, proxyString = null) {
+  let totalClaimed = 0;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  const claimMutation = `
+    mutation CompleteQuest($questId: String!) {
+      completeQuest(questId: $questId) {
+        success
+      }
+    }
+  `;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    logger.loading(`Checking for ready quests (attempt ${attempts})...`);
+
+    const account = await getQuestProgress(sessionCookie, proxyString);
+    const readyQuests = account.questProgresses.filter(progress => progress.status === "READY_TO_CLAIM");
+
+    if (readyQuests.length === 0) {
+      logger.info("No more quests ready to claim");
+      break; // Tidak ada quest siap klaim, keluar loop
+    }
+
+    logger.step(`Found ${readyQuests.length} quest(s) ready to claim`);
+
+    for (const progress of readyQuests) {
+      try {
+        logger.loading(`Claiming quest: ${progress.quest.name}`);
+
+        const config = createAxiosConfig(proxyString, {
+          ...baseHeaders,
+          cookie: sessionCookie,
+          Referer: "https://voyager.preview.craft-world.gg/missions/daily"
+        });
+
+        const claimResponse = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
+          query: claimMutation,
+          variables: { questId: progress.quest.id }
+        }, config);
+
+        if (claimResponse.data.data.completeQuest.success) {
+          logger.success(`Quest "${progress.quest.name}" claimed successfully`);
+          totalClaimed++;
+        } else {
+          logger.error(`Failed to claim quest "${progress.quest.name}"`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay antar klaim
+      } catch (error) {
+        logger.error(`Error claiming quest "${progress.quest.name}": ${error.message}`);
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Delay antar attempt
+  }
+
+  return totalClaimed;
+}
+
+function extractSessionCookie(response) {
+  const setCookieHeader = response.headers['set-cookie'];
+  if (setCookieHeader) {
+    const sessionCookie = setCookieHeader.find(cookie => cookie.startsWith('session='));
+    if (sessionCookie) {
+      return sessionCookie.split(';')[0];
+    }
+  }
+  return null;
+}
+
 async function processSingleWallet(privateKey, accountIndex, proxyString = null) {
   logger.info(`Memulai proses untuk Wallet ${accountIndex} (${privateKey.substring(0, 8)}...) menggunakan Proxy: ${proxyString || 'Tidak ada'})`);
 
@@ -434,7 +411,7 @@ async function processSingleWallet(privateKey, accountIndex, proxyString = null)
 
     logger.loading("Authenticating with signature...");
     // FIREBASE_API_KEY ini bisa dari process.env atau hardcode jika tidak diset.
-    const firebaseKey = process.env.FIREBASE_API_KEY || "AIzaSyDgDDykbRrhbdfWUpm1BUgj4ga7d_-wy_g"; 
+    const firebaseKey = process.env.FIREBASE_API_KEY || "AIzaSyDgDDykbRrhbdfWUpm1BUgj4ga7d_-wy_g";
     const configLogin = createAxiosConfig(proxyString, { ...baseHeaders, "x-firebase-appcheck": appCheckToken });
     const loginResponse = await axios.post("https://voyager.preview.craft-world.gg/auth/login", {
       payload: { signature, payload }
@@ -461,7 +438,7 @@ async function processSingleWallet(privateKey, accountIndex, proxyString = null)
     logger.loading("Creating session...");
     const configSession = createAxiosConfig(proxyString, baseHeaders);
     // VOYAGER_API_KEY ini bisa dari process.env.
-    // Jika tidak diset sebagai ENV, kemungkinan besar bot akan jalan tapi API game mungkin menolak request.
+    // Jika tidak diset sebagai ENV, bot akan tetap mencoba jalan tanpa header ini.
     if (process.env.VOYAGER_API_KEY) {
         configSession.headers['X-API-KEY'] = process.env.VOYAGER_API_KEY;
     }
@@ -481,7 +458,7 @@ async function processSingleWallet(privateKey, accountIndex, proxyString = null)
     logger.info(`Quest Points: ${account.questPoints}`);
     logger.info(`Loyalty Multiplier: ${account.loyaltyMultiplier}`);
     logger.info(`Rank: ${account.rank.name} (SubRank: ${account.rank.subRank})`);
-    logger.info(`Next Rank: ${account.rank.nextRank} (${account.rank.nextRankRequiredPoints} points needed)`);
+    logger.info(`Next Rank: ${account.rank.nextRank} (${account.rank.nextRankRequiredPoints} points needed})`);
 
     logger.step("Performing daily login...");
     const dailyLoginMutation = `
@@ -555,19 +532,16 @@ async function processSingleWallet(privateKey, accountIndex, proxyString = null)
 }
 
 async function main() {
-  // logger.banner(); // Nonaktifkan banner untuk mode 1x run di GitHub Actions
-
-  logger.info("Memulai Voyager CraftWorld Bot (1x Run)...");
+  logger.info("Memulai Voyager CraftWorld Bot (1x Run, Tanpa Proxy)...");
 
   // --- Ambil Private Keys dari Environment Variable ---
   // Private keys dipisahkan koma (,) dalam satu string di GitHub Secret: PRIVATE_KEYS
   const rawPrivateKeys = process.env.PRIVATE_KEYS;
   const privateKeys = rawPrivateKeys ? rawPrivateKeys.split(',').map(key => key.trim()).filter(key => key !== '') : [];
 
-  // --- Ambil Data Proxies dari Environment Variable ---
-  // Proxies dipisahkan oleh newline (\n) dalam satu string di GitHub Secret: PROXIES_DATA
-  const rawProxies = process.env.PROXIES_DATA;
-  const proxies = rawProxies ? rawProxies.split('\n').map(proxy => proxy.trim()).filter(proxy => proxy !== '') : [];
+  // --- Bagian proxy dihapus / diabaikan sepenuhnya di sini ---
+  const proxies = []; // Daftar proxy kosong karena bot berjalan tanpa proxy
+  let workingProxies = []; // Daftar proxy yang berfungsi juga kosong
 
   if (privateKeys.length === 0) {
     logger.error("PRIVATE_KEYS tidak ditemukan atau kosong di environment variables. Bot berhenti.");
@@ -575,32 +549,15 @@ async function main() {
     process.exit(1); // Keluar dengan kode error
   }
 
-  let workingProxies = [];
-  if (proxies.length > 0) {
-    logger.step("Menguji konektivitas proxy...");
-    // Uji semua proxy dan kumpulkan yang berfungsi
-    for (const proxyString of proxies) { // Gunakan proxyString langsung
-      if (await testProxy(proxyString, 5000)) { // Menggunakan timeout 5 detik untuk pengujian
-        workingProxies.push(proxyString); // Simpan string proxy yang berfungsi
-      }
-    }
-    if (workingProxies.length === 0) {
-      logger.warn("Tidak ada proxy yang berfungsi. Melanjutkan tanpa proxy.");
-    } else {
-      logger.info(`${workingProxies.length} dari ${proxies.length} proxy berfungsi.`);
-    }
-  } else {
-    logger.info("Tidak ada proxy yang disediakan. Melanjutkan tanpa proxy.");
-  }
-
+  logger.info("Bot dikonfigurasi untuk berjalan TANPA PROXY.");
+  
   const results = [];
   // Loop melalui setiap private key untuk memproses wallet
   for (let i = 0; i < privateKeys.length; i++) {
     const privateKey = privateKeys[i];
-    // Rotasi proxy jika ada workingProxies
-    const currentProxyString = workingProxies.length > 0 ? workingProxies[i % workingProxies.length] : null;
+    const currentProxyString = null; // Selalu null karena tidak pakai proxy
     logger.step(`Memulai pemrosesan untuk wallet ${i + 1} dari ${privateKeys.length}...`);
-    const result = await processSingleWallet(privateKey, i + 1, currentProxyString); // Kirim string proxy
+    const result = await processSingleWallet(privateKey, i + 1, currentProxyString); // Kirim null untuk proxy
     results.push(result);
 
     // Tambahkan delay antar wallet jika ada lebih dari satu
