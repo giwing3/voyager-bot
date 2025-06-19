@@ -29,10 +29,10 @@ jobs:
           PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }}
           # RPC_URL: URL RPC provider Ethereum/EVM kamu.
           # Contoh Value: https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-          RPC_URL: ${{ secrets.RPC_URL }}
+          #RPC_URL: ${{ secrets.RPC_URL }}
           # VOYAGER_API_KEY: API Key spesifik untuk game Voyager CraftWorld.
           # Contoh Value: YOUR_VOYAGER_API_KEY_HERE
-          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
+          #VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
           # TELEGRAM_BOT_TOKEN: Token bot Telegram kamu (dari @BotFather).
           # Contoh Value: 123456:ABC-DEF
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
