@@ -4,6 +4,8 @@ on:
   schedule:
     # Menjalankan setiap hari pada pukul 00:00 UTC (07:00 pagi WIB)
     - cron: '0 0 * * *'
+  
+  workflow_dispatch: # Tambahkan baris ini!
 
 jobs:
   run_bot:
@@ -16,34 +18,22 @@ jobs:
       - name: Setup Node.js Environment
         uses: actions/setup-node@v3
         with:
-          node-version: '18' # Atau '20' sesuai keinginan dan kompatibilitas
+          node-version: '18'
 
       - name: Install Node.js dependencies
         run: npm ci
 
       - name: Jalankan Voyager Bot dengan Environment Variables dari Secrets
         env:
-          # --- SECRETS WAJIB ---
-          # PRIVATE_KEYS: Kunci privat kamu, dipisahkan KOMA (,) jika banyak.
-          # Contoh Value: 0x123...,0x456...
           PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }}
-          # RPC_URL: URL RPC provider Ethereum/EVM kamu.
-          # Contoh Value: https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-          #RPC_URL: ${{ secrets.RPC_URL }}
-          # VOYAGER_API_KEY: API Key spesifik untuk game Voyager CraftWorld.
-          # Contoh Value: YOUR_VOYAGER_API_KEY_HERE
-          #VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
-          # TELEGRAM_BOT_TOKEN: Token bot Telegram kamu (dari @BotFather).
-          # Contoh Value: 123456:ABC-DEF
+          RPC_URL: ${{ secrets.RPC_URL }}
+          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          # TELEGRAM_CHAT_ID: ID chat Telegram (bisa ID user, ID grup, atau ID channel).
-          # Contoh Value: 123456789 (user) atau -1234567890123 (group/channel)
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # PROXIES_DATA: Daftar proxy, setiap proxy di BARIS BARU.
-          # Contoh Value: (di GitHub Secrets, tekan Enter untuk baris baru)
-          #   http://user:pass@ip1:port1
-          #   socks5://user:pass@ip2:port2
           PROXIES_DATA: ${{ secrets.PROXIES_DATA }}
-
-         
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          PROXY_USER: ${{ secrets.PROXY_USER }}
+          PROXY_PASS: ${{ secrets.PROXY_PASS }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          
         run: node index.js
