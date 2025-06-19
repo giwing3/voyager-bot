@@ -4,8 +4,8 @@ on:
   schedule:
     # Menjalankan setiap hari pada pukul 00:00 UTC (07:00 pagi WIB)
     - cron: '0 0 * * *'
-  
-  workflow_dispatch: # Tambahkan baris ini!
+
+  workflow_dispatch: # Memungkinkan menjalankan manual
 
 jobs:
   run_bot:
@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js Environment
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '18' # Pastikan versi Node.js ini kompatibel dengan skripmu
 
       - name: Install Node.js dependencies
         run: npm ci
@@ -27,13 +27,14 @@ jobs:
         env:
           PRIVATE_KEYS: ${{ secrets.PRIVATE_KEYS }}
           RPC_URL: ${{ secrets.RPC_URL }}
-          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROXIES_DATA: ${{ secrets.PROXIES_DATA }}
+
+          # Optional secrets, skrip akan mencoba membacanya jika ada
+          VOYAGER_API_KEY: ${{ secrets.VOYAGER_API_KEY }}
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          PROXY_USER: ${{ secrets.PROXY_USER }}
-          PROXY_PASS: ${{ secrets.PROXY_PASS }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          
+
+          # --- BARIS PROXIES_DATA, PROXY_USER, PROXY_PASS DIHAPUS DARI SINI ---
+
         run: node index.js
