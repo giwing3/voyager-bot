@@ -1,12 +1,15 @@
-require('dotenv').config();
+// index.js (Versi Final Revisi Lengkap: 1x Run & Notifikasi Telegram)
+
+require('dotenv').config(); // Berguna untuk environment variables lokal (tidak di-commit ke Git)
 const axios = require('axios');
 const { ethers } = require('ethers');
-const { SiweMessage } = require('siwe'); 
+const { SiweMessage } = require('siwe');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { HttpProxyAgent } = require('http-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
-const fs = require('fs');
-const path = require('path');
+// fs dan path tidak lagi dibutuhkan karena tidak membaca file lokal
+// const fs = require('fs');
+// const path = require('path');
 
 const colors = {
   reset: "\x1b[0m",
@@ -26,15 +29,16 @@ const logger = {
   error: (msg) => console.log(`${colors.red}[✗] ${msg}${colors.reset}`),
   success: (msg) => console.log(`${colors.green}[✅] ${msg}${colors.reset}`),
   loading: (msg) => console.log(`${colors.cyan}[⟳] ${msg}${colors.reset}`),
-  step: (msg) => console.log(`${colors.white}[➤] ${msg}${colors.reset}`),
-  countdown: (msg) => process.stdout.write(`\r${colors.blue}[⏰] ${msg}${colors.reset}`),
-  banner: () => {
-    console.log(`${colors.cyan}${colors.bold}`);
-    console.log(`---------------------------------------------`);
-    console.log(`  Voyager CW Auto Bot - Airdrop Insiders  `);
-    console.log(`---------------------------------------------${colors.reset}`);
-    console.log();
-  }
+  step: (msg) => console.log(`${colors.blue}[➤] ${msg}${colors.reset}`),
+  // countdown dan banner tidak relevan untuk 1x run di GitHub Actions
+  // countdown: (msg) => process.stdout.write(`\r${colors.blue}[⏰] ${msg}${colors.reset}`),
+  // banner: () => {
+  //   console.log(`${colors.cyan}${colors.bold}`);
+  //   console.log(`---------------------------------------------`);
+  //   console.log(`  Voyager CW Auto Bot - Airdrop Insiders   `);
+  //   console.log(`---------------------------------------------${colors.reset}`);
+  //   console.log();
+  // }
 };
 
 const userAgents = [
@@ -59,169 +63,126 @@ function getRandomUserAgent() {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-function loadProxies() {
-  try {
-    const proxiesPath = path.join(__dirname, 'proxies.txt');
-    if (!fs.existsSync(proxiesPath)) {
-      logger.warn("proxies.txt not found. Running without proxy support.");
-      return [];
-    }
-    
-    const proxiesData = fs.readFileSync(proxiesPath, 'utf8');
-    const proxies = proxiesData
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#'))
-      .map(proxy => parseProxy(proxy))
-      .filter(proxy => proxy !== null);
-    
-    logger.info(`Loaded ${proxies.length} proxies from proxies.txt`);
-    return proxies;
-  } catch (error) {
-    logger.error(`Error loading proxies: ${error.message}`);
-    return [];
+// Fungsi untuk mengirim notifikasi Telegram
+async function sendTelegramNotification(message) {
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    logger.warn("TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID tidak ditemukan di environment variables. Notifikasi Telegram dilewati.");
+    return;
   }
-}
 
-function parseProxy(proxyString) {
+  const telegramApiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
   try {
-    
-    let cleanProxy = proxyString.replace(/^(https?|socks[45]?):\/\//, '');
-
-    let auth = null;
-    let hostPort = cleanProxy;
-    
-    if (cleanProxy.includes('@')) {
-      const [authPart, hostPortPart] = cleanProxy.split('@');
-      auth = authPart;
-      hostPort = hostPortPart;
-    }
-    
-    const [host, port] = hostPort.split(':');
-    
-    if (!host || !port) {
-      logger.warn(`Invalid proxy format: ${proxyString}`);
-      return null;
-    }
-
-    let type = 'http'; 
-    if (proxyString.toLowerCase().includes('socks5')) {
-      type = 'socks5';
-    } else if (proxyString.toLowerCase().includes('socks4')) {
-      type = 'socks4';
-    } else if (proxyString.toLowerCase().includes('https')) {
-      type = 'https';
-    }
-    
-    return {
-      type,
-      host,
-      port: parseInt(port),
-      auth,
-      original: proxyString
-    };
-  } catch (error) {
-    logger.warn(`Failed to parse proxy: ${proxyString} - ${error.message}`);
-    return null;
-  }
-}
-
-function createProxyAgent(proxy) {
-  try {
-    const { type, host, port, auth } = proxy;
-
-    // Default protocol if not specified
-    let protocol = type.includes('socks') ? `${type}:` : 'http:';
-
-    if (type === 'socks4' || type === 'socks5') {
-      return new SocksProxyAgent(`${protocol}//${auth ? auth + '@' : ''}${host}:${port}`);
-    }
-
-    // HTTP(S) proxies need this format object for proper auth handling
-    const proxyOptions = {
-      host,
-      port,
-      protocol: protocol,
-    };
-
-    if (auth) {
-      const [username, password] = auth.split(':');
-      proxyOptions.auth = `${username}:${password}`;
-    }
-
-    if (type === 'https') {
-      return new HttpsProxyAgent(proxyOptions);
-    } else {
-      return new HttpProxyAgent(proxyOptions);
-    }
-  } catch (error) {
-    logger.error(`Failed to create proxy agent for ${proxy.original}: ${error.message}`);
-    return null;
-  }
-}
-
-
-
-async function testProxy(proxy, timeout = 10000) {
-  try {
-    const agent = createProxyAgent(proxy);
-    if (!agent) return false;
-    
-    const response = await axios.get('https://httpbin.org/ip', {
-      httpsAgent: agent,
-      httpAgent: agent,
-      timeout,
-      headers: {
-        'User-Agent': getRandomUserAgent()
-      }
+    await axios.post(telegramApiUrl, {
+      chat_id: CHAT_ID,
+      text: message,
+      parse_mode: 'Markdown'
     });
-    
-    logger.success(`Proxy ${proxy.host}:${proxy.port} is working - IP: ${response.data.origin}`);
+    logger.success("Notifikasi Telegram berhasil dikirim.");
+  } catch (error) {
+    logger.error(`Gagal mengirim notifikasi Telegram: ${error.message}`);
+    if (error.response) {
+      logger.error(`Telegram API response: ${JSON.stringify(error.response.data)}`);
+    }
+  }
+}
+
+// Fungsi untuk mendapatkan agent proxy dari string proxy
+function createProxyAgent(proxyString) {
+  if (!proxyString) return null;
+
+  let protocolMatch = proxyString.match(/^(https?|socks[45]?):\/\//i);
+  let protocol = protocolMatch ? protocolMatch[1].toLowerCase() : 'http'; // Default to http if no protocol specified
+
+  let cleanProxy = proxyString.replace(/^(https?|socks[45]?):\/\//i, '');
+
+  let auth = null;
+  let hostPort = cleanProxy;
+
+  if (cleanProxy.includes('@')) {
+    const parts = cleanProxy.split('@');
+    auth = parts[0];
+    hostPort = parts[1];
+  }
+
+  const [host, port] = hostPort.split(':');
+
+  if (!host || !port) {
+    logger.warn(`Invalid proxy format: ${proxyString}. Skipping.`);
+    return null;
+  }
+
+  const agentOptions = {
+    host,
+    port: parseInt(port),
+  };
+
+  if (auth) {
+    const [username, password] = auth.split(':');
+    agentOptions.username = username;
+    agentOptions.password = password;
+  }
+
+  if (protocol.startsWith('socks')) {
+    // Note: socks-proxy-agent expects full URL including protocol and auth
+    return new SocksProxyAgent(`${protocol}://${auth ? auth + '@' : ''}${host}:${port}`);
+  } else if (protocol === 'https') {
+    // Note: https-proxy-agent expects full URL including protocol and auth
+    return new HttpsProxyAgent(`https://${auth ? auth + '@' : ''}${host}:${port}`);
+  } else {
+    // Note: http-proxy-agent expects full URL including protocol and auth
+    return new HttpProxyAgent(`http://${auth ? auth + '@' : ''}${host}:${port}`);
+  }
+}
+
+// Fungsi untuk menguji proxy
+async function testProxy(proxyString, timeout = 10000) {
+  try {
+    const agent = createProxyAgent(proxyString);
+    if (!agent) return false;
+
+    // Menggunakan httpbin.org untuk validasi IP eksternal
+    const response = await axios.get('https://httpbin.org/ip', {
+      httpsAgent: agent, // Gunakan httpsAgent untuk HTTPS test
+      httpAgent: agent,   // Gunakan httpAgent untuk HTTP test
+      timeout,
+      headers: { 'User-Agent': getRandomUserAgent() }
+    });
+
+    logger.success(`Proxy ${proxyString} is working. Origin IP: ${response.data.origin}`);
     return true;
   } catch (error) {
-    logger.error(`Proxy ${proxy.host}:${proxy.port} failed: ${error.message}`);
+    logger.error(`Proxy ${proxyString} failed: ${error.message}`);
     return false;
   }
 }
 
-async function getWorkingProxy(proxies) {
-  if (proxies.length === 0) {
-    return null;
-  }
-
-  const shuffledProxies = [...proxies].sort(() => Math.random() - 0.5);
-  
-  for (const proxy of shuffledProxies) {
-    logger.loading(`Testing proxy ${proxy.host}:${proxy.port}...`);
-    if (await testProxy(proxy)) {
-      return proxy;
-    }
-  }
-  
-  logger.warn("No working proxy found, continuing without proxy");
-  return null;
-}
-
-function createAxiosConfig(proxy = null, additionalHeaders = {}) {
-  const userAgent = getRandomUserAgent();
+// Fungsi untuk membuat konfigurasi Axios dengan atau tanpa proxy
+function createAxiosConfig(proxyString = null, additionalHeaders = {}) {
   const config = {
     headers: {
-      'User-Agent': userAgent,
+      'User-Agent': getRandomUserAgent(),
       ...additionalHeaders
     },
-    timeout: 30000
+    timeout: 30000 // Timeout default 30 detik
   };
-  
-  if (proxy) {
-    const agent = createProxyAgent(proxy);
+
+  if (proxyString) {
+    const agent = createProxyAgent(proxyString);
     if (agent) {
       config.httpsAgent = agent;
       config.httpAgent = agent;
     }
   }
-  
   return config;
 }
+
+// Catatan: appCheckToken ini terdeteksi hardcoded di skrip awal kamu.
+// Jika ini harus dynamic atau disembunyikan, sebaiknya dijadikan GitHub Secret juga.
+// Jika tidak diset sebagai ENV, dia akan menggunakan nilai hardcoded ini.
+const appCheckToken = process.env.FIREBASE_APP_CHECK_TOKEN || "eyJraWQiOiJrTFRMakEiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxOjU0MzEyMzE3NDQyOndlYjo1ODVmNjIzNTRkYjUzYzE0MmJlZDFiIiwiYXVkIjpbInByb2plY3RzXC81NDMxMjMxNzQ0MiIsInByb2plY3RzXC9nYW1lLXByZXZpZXctNTFjMmEiXSwicHJvdmlkZXIiOiJyZWNhcHRjaGFfdjMiLCJpc3MiOiJodHRwczpcL1wvZmlyZWJhc2VhcHBjaGVjay5nb29nbGVhcGlzLmNvbVwvNTQzMTIzMTc0NDIiLCJleHAiOjE3NTAwNTIyNDQsImlhdCI6MTc0OTk2NTg0NCwianRpIjoiUmFETTZUdUNqR2tLSEhFU05pa0xzLVJrdUxnRGJTbU1XeHF4N2xYZ0dNayJ9.AOfqTMnxe4v6Ze_yzB4MbZ1vatoRSMY0N3QoHDc4NV6fJVom9Re-XLbR7KA7njZicRtZu9sWUTTnAXlIePnkgP3SQXtx-28c9ze2O2waJMvUPqAeH4PSSck7KhD3YyggwfLzZgTlj2d7NdImGLdOhVZdVmWq-HSAUV95nLFvgSzEbi-SBO0PJqUWrTsq1_CSMnJtNQfKQ1g4_2jrhHvvupNpQFIg20z1-vm9u_Kal8LaZHrJdqkONRvk4SVPjkIdPzxng4vZ14PooF82SVsVq4WRJDPawzdPpDlSiMadJYKqwlNu-2JZL4jNPWJUtZEbQ8OD4-mgYsdAPUxysKSXck81RlIPuvUkaqHX5MbhSRtatjRRoJBedS-8oUfbcX-rYTesQdQ94gkz9--QuJD7U1-uR_GZxwlnfrVQT-DtbQTgBBq2Wh6TPSu8Hn7-XDefUsXFineIwSbBVSGlJbNm_TrjOJinbqNqYyOTiTtl6tfswpF3Zxrm0QzyVaL7TCAD";
 
 const baseHeaders = {
   accept: "*/*",
@@ -237,70 +198,7 @@ const baseHeaders = {
   "Referrer-Policy": "strict-origin-when-cross-origin"
 };
 
-const appCheckToken = "eyJraWQiOiJrTFRMakEiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxOjU0MzEyMzE3NDQyOndlYjo1ODVmNjIzNTRkYjUzYzE0MmJlZDFiIiwiYXVkIjpbInByb2plY3RzXC81NDMxMjMxNzQ0MiIsInByb2plY3RzXC9nYW1lLXByZXZpZXctNTFjMmEiXSwicHJvdmlkZXIiOiJyZWNhcHRjaGFfdjMiLCJpc3MiOiJodHRwczpcL1wvZmlyZWJhc2VhcHBjaGVjay5nb29nbGVhcGlzLmNvbVwvNTQzMTIzMTc0NDIiLCJleHAiOjE3NTAwNTIyNDQsImlhdCI6MTc0OTk2NTg0NCwianRpIjoiUmFETTZUdUNqR2tLSEhFU05pa0xzLVJrdUxnRGJTbU1XeHF4N2xYZ0dNayJ9.AOfqTMnxe4v6Ze_yzB4MbZ1vatoRSMY0N3QoHDc4NV6fJVom9Re-XLbR7KA7njZicRtZu9sWUTTnAXlIePnkgP3SQXtx-28c9ze2O2waJMvUPqAeH4PSSck7KhD3YyggwfLzZgTlj2d7NdImGLdOhVZdVmWq-HSAUV95nLFvgSzEbi-SBO0PJqUWrTsq1_CSMnJtNQfKQ1g4_2jrhHvvupNpQFIg20z1-vm9u_Kal8LaZHrJdqkONRvk4SVPjkIdPzxng4vZ14PooF82SVsVq4WRJDPawzdPqDlSiMadJYKqwlNu-2JZL4jNPWJUtZEbQ8OD4-mgYsdAPUxysKSXck81RlIPuvUkaqHX5MbhSRtatjRRoJBedS-8oUfbcX-rYTesQdQ94gkz9--QuJD7U1-uR_GZxwlnfrVQT-DtbQTgBBq2Wh6TPSu8Hn7-XDefUsXFineIwSbBVSGlJbNm_TrjOJinbqNqYyOTiTtl6tfswpF3Zxrm0QzyVaL7TCAD";
-
-function extractSessionCookie(response) {
-  const setCookieHeader = response.headers['set-cookie'];
-  if (setCookieHeader) {
-    const sessionCookie = setCookieHeader.find(cookie => cookie.startsWith('session='));
-    if (sessionCookie) {
-      return sessionCookie.split(';')[0];
-    }
-  }
-  return null;
-}
-
-async function getShopChestLimits(sessionCookie, proxy = null) {
-  const shopChestsQuery = `
-    query GetShopChests {
-      account {
-        getShopChests {
-          id
-          name
-          tier
-          icon
-          description
-          acquisitionMethod
-          dailyPurchases
-          dailyLimit
-          price {
-            unit
-            amount
-          }
-          reward {
-            chance
-            crystals
-            equipmentId
-          }
-          requirement {
-            nft {
-              collectionIds
-              dailyLimit {
-                minNFTAmount
-                chestCount
-              }
-            }
-          }
-        }
-      }
-    }
-  `;
-  
-  const config = createAxiosConfig(proxy, {
-    ...baseHeaders,
-    cookie: sessionCookie,
-    Referer: "https://voyager.preview.craft-world.gg/shop"
-  });
-  
-  const response = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
-    query: shopChestsQuery,
-    variables: {}
-  }, config);
-  
-  return response.data.data.account.getShopChests;
-}
-
-async function getQuestProgress(sessionCookie, proxy = null) {
+async function getQuestProgress(sessionCookie, proxyString = null) {
   const questProgressQuery = `
     query QuestProgress {
       account {
@@ -350,19 +248,70 @@ async function getQuestProgress(sessionCookie, proxy = null) {
       }
     }
   `;
-  
-  const config = createAxiosConfig(proxy, baseHeaders);
+
+  const config = createAxiosConfig(proxyString, baseHeaders);
   config.headers.cookie = sessionCookie;
-  
+
   const response = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
     query: questProgressQuery,
     variables: {}
   }, config);
-  
+
   return response.data.data.account;
 }
 
-async function spinChestIfAvailable(chestId, chestName, sessionCookie, chests, proxy = null) {
+async function getShopChestLimits(sessionCookie, proxyString = null) {
+  const shopChestsQuery = `
+    query GetShopChests {
+      account {
+        getShopChests {
+          id
+          name
+          tier
+          icon
+          description
+          acquisitionMethod
+          dailyPurchases
+          dailyLimit
+          price {
+            unit
+            amount
+          }
+          reward {
+            chance
+            crystals
+            equipmentId
+          }
+          requirement {
+            nft {
+              collectionIds
+              dailyLimit {
+                minNFTAmount
+                chestCount
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const config = createAxiosConfig(proxyString, {
+    ...baseHeaders,
+    cookie: sessionCookie,
+    Referer: "https://voyager.preview.craft-world.gg/shop"
+  });
+
+  const response = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
+    query: shopChestsQuery,
+    variables: {}
+  }, config);
+
+  return response.data.data.account.getShopChests;
+}
+
+
+async function spinChestIfAvailable(chestId, chestName, sessionCookie, chests, proxyString = null) {
   const chest = chests.find(c => c.id === chestId);
   if (!chest) {
     logger.error(`Chest ${chestId} not found in shop data`);
@@ -400,8 +349,8 @@ async function spinChestIfAvailable(chestId, chestName, sessionCookie, chests, p
   for (let i = 0; i < remainingSpins; i++) {
     try {
       logger.loading(`Spinning ${chestName} (${i + 1}/${remainingSpins})...`);
-      
-      const config = createAxiosConfig(proxy, {
+
+      const config = createAxiosConfig(proxyString, {
         ...baseHeaders,
         cookie: sessionCookie,
         Referer: "https://voyager.preview.craft-world.gg/shop"
@@ -424,159 +373,58 @@ async function spinChestIfAvailable(chestId, chestName, sessionCookie, chests, p
         successfulSpins++;
       } else {
         logger.error(`Failed to open ${chestName} #${i + 1}: Invalid response`);
-        break;
+        break; // Berhenti jika respons tidak valid
       }
 
       if (i < remainingSpins - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay antar spin
       }
     } catch (error) {
       logger.error(`Error opening ${chestName} #${i + 1}: ${error.message}`);
       if (error.response?.status === 429) {
         logger.warn("Rate limit reached, stopping chest spins");
-        break;
+        break; // Berhenti jika ada rate limit
       }
     }
   }
-  
+
   return successfulSpins;
 }
 
-async function claimAllReadyQuests(sessionCookie, proxy = null) {
-  let totalClaimed = 0;
-  let attempts = 0;
-  const maxAttempts = 10; 
-  
-  const claimMutation = `
-    mutation CompleteQuest($questId: String!) {
-      completeQuest(questId: $questId) {
-        success
-      }
-    }
-  `;
+async function processSingleWallet(privateKey, accountIndex, proxyString = null) {
+  logger.info(`Memulai proses untuk Wallet ${accountIndex} (${privateKey.substring(0, 8)}...) menggunakan Proxy: ${proxyString || 'Tidak ada'})`);
 
-  while (attempts < maxAttempts) {
-    attempts++;
-    logger.loading(`Checking for ready quests (attempt ${attempts})...`);
-    
-    const account = await getQuestProgress(sessionCookie, proxy);
-    const readyQuests = account.questProgresses.filter(progress => progress.status === "READY_TO_CLAIM");
-    
-    if (readyQuests.length === 0) {
-      logger.info("No more quests ready to claim");
-      break;
-    }
-    
-    logger.step(`Found ${readyQuests.length} quest(s) ready to claim`);
-    
-    for (const progress of readyQuests) {
-      try {
-        logger.loading(`Claiming quest: ${progress.quest.name}`);
-        
-        const config = createAxiosConfig(proxy, {
-          ...baseHeaders,
-          cookie: sessionCookie,
-          Referer: "https://voyager.preview.craft-world.gg/missions/daily"
-        });
-        
-        const claimResponse = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
-          query: claimMutation,
-          variables: { questId: progress.quest.id }
-        }, config);
-        
-        if (claimResponse.data.data.completeQuest.success) {
-          logger.success(`Quest "${progress.quest.name}" claimed successfully`);
-          totalClaimed++;
-        } else {
-          logger.error(`Failed to claim quest "${progress.quest.name}"`);
-        }
+  const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+  const wallet = new ethers.Wallet(privateKey, provider);
+  const signer = wallet.connect(provider);
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        logger.error(`Error claiming quest "${progress.quest.name}": ${error.message}`);
-      }
-    }
+  let questsClaimed = 0;
+  let chestsOpened = 0;
+  let errorMessage = null;
+  let walletAddress = "N/A"; // Default jika terjadi error sebelum mendapatkan address
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  
-  return totalClaimed;
-}
-
-function getNextDailyReset() {
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  tomorrow.setUTCHours(0, 0, 0, 0);
-  return tomorrow;
-}
-
-function formatTimeRemaining(ms) {
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function startCountdown() {
-  const nextReset = getNextDailyReset();
-  
-  const updateCountdown = () => {
-    const now = new Date();
-    const timeRemaining = nextReset.getTime() - now.getTime();
-    
-    if (timeRemaining <= 0) {
-      console.log(`\n${colors.green}[🎉] Daily reset occurred! Starting new cycle...${colors.reset}`);
-      return true; 
-    }
-    
-    const timeString = formatTimeRemaining(timeRemaining);
-    logger.countdown(`Next daily reset in: ${timeString} | Press Ctrl+C to stop`);
-    
-    return false;
-  };
-  
-  return new Promise((resolve) => {
-    const interval = setInterval(() => {
-      if (updateCountdown()) {
-        clearInterval(interval);
-        resolve();
-      }
-    }, 1000);
-
-    process.on('SIGINT', () => {
-      clearInterval(interval);
-      console.log(`\n${colors.yellow}[👋] Bot stopped by user${colors.reset}`);
-      process.exit(0);
-    });
-  });
-}
-
-async function processWallet(privateKey, index, proxy = null) {
   try {
-    const proxyInfo = proxy ? `${proxy.host}:${proxy.port}` : 'No proxy';
-    logger.step(`Processing wallet ${index + 1} | Proxy: ${proxyInfo}`);
+    walletAddress = await signer.getAddress();
+    const chainId = (await provider.getNetwork()).chainId;
 
-    const wallet = new ethers.Wallet(privateKey);
-    const address = wallet.address;
-    logger.info(`Wallet address: ${address}`);
-
+    // Bagian Sign-In with Ethereum (SIWE)
+    // Dapatkan nonce dan detail payload lainnya dari API game terlebih dahulu
     logger.loading("Fetching authentication payload...");
-    const config1 = createAxiosConfig(proxy, baseHeaders);
+    const configAuthPayload = createAxiosConfig(proxyString, baseHeaders);
     const payloadResponse = await axios.post("https://voyager.preview.craft-world.gg/auth/payload", {
-      address,
-      chainId: "2020"
-    }, config1);
+      address: walletAddress,
+      chainId: chainId.toString()
+    }, configAuthPayload);
     const payload = payloadResponse.data.payload;
 
     logger.loading("Signing SIWE message...");
     const siweMessage = new SiweMessage({
       domain: payload.domain,
-      address,
+      address: walletAddress,
       statement: payload.statement,
       uri: payload.uri,
       version: payload.version,
-      chainId: payload.chain_id,
+      chainId: parseInt(payload.chain_id),
       nonce: payload.nonce,
       issuedAt: payload.issued_at,
       expirationTime: payload.expiration_time
@@ -585,66 +433,57 @@ async function processWallet(privateKey, index, proxy = null) {
     logger.success("SIWE message signed");
 
     logger.loading("Authenticating with signature...");
-    const config2 = createAxiosConfig(proxy, { ...baseHeaders, "x-firebase-appcheck": appCheckToken });
+    // FIREBASE_API_KEY ini bisa dari process.env atau hardcode jika tidak diset.
+    const firebaseKey = process.env.FIREBASE_API_KEY || "AIzaSyDgDDykbRrhbdfWUpm1BUgj4ga7d_-wy_g"; 
+    const configLogin = createAxiosConfig(proxyString, { ...baseHeaders, "x-firebase-appcheck": appCheckToken });
     const loginResponse = await axios.post("https://voyager.preview.craft-world.gg/auth/login", {
       payload: { signature, payload }
-    }, config2);
+    }, configLogin);
     const customToken = loginResponse.data.customToken;
+    logger.success("Authenticated with signature, got custom token.");
 
-    logger.loading("Signing in with custom token...");
-    const config3 = createAxiosConfig(proxy, {
+    logger.loading("Signing in with custom token to Firebase...");
+    const configFirebase = createAxiosConfig(proxyString, {
       ...baseHeaders,
       "x-client-version": "Chrome/JsCore/11.8.0/FirebaseCore-web",
       "x-firebase-appcheck": appCheckToken,
-      "x-firebase-gmpid": "1:54312317442:web:585f62354db53c142bed1b"
+      "x-firebase-gmpid": "1:54312317442:web:585f62354db53c142bed1b",
+      "Referrer-Policy": "no-referrer" // Mengganti strict-origin-when-cross-origin untuk Firebase
     });
-    config3.referrerPolicy = "no-referrer";
-    
-    const signInResponse = await axios.post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=AIzaSyDgDDykbRrhbdfWUpm1BUgj4ga7d_-wy_g", {
+
+    const signInResponse = await axios.post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseKey}`, {
       token: customToken,
       returnSecureToken: true
-    }, config3);
+    }, configFirebase);
     const idToken = signInResponse.data.idToken;
-    logger.success("Signed in successfully");
-
-    logger.loading("Fetching user information...");
-    const config4 = createAxiosConfig(proxy, {
-      ...baseHeaders,
-      "x-client-version": "Chrome/JsCore/11.8.0/FirebaseCore-web",
-      "x-firebase-appcheck": appCheckToken,
-      "x-firebase-gmpid": "1:54312317442:web:585f62354db53c142bed1b"
-    });
-    config4.referrerPolicy = "no-referrer";
-    
-    const userInfoResponse = await axios.post("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyDgDDykbRrhbdfWUpm1BUgj4ga7d_-wy_g", {
-      idToken
-    }, config4);
-    const userInfo = userInfoResponse.data.users[0];
-    logger.info(`User ID: ${userInfo.localId}`);
-    logger.info(`Last Login: ${new Date(parseInt(userInfo.lastLoginAt)).toISOString()}`);
-    logger.info(`Created At: ${new Date(parseInt(userInfo.createdAt)).toISOString()}`);
+    logger.success("Signed in to Firebase successfully");
 
     logger.loading("Creating session...");
-    const config5 = createAxiosConfig(proxy, baseHeaders);
+    const configSession = createAxiosConfig(proxyString, baseHeaders);
+    // VOYAGER_API_KEY ini bisa dari process.env.
+    // Jika tidak diset sebagai ENV, kemungkinan besar bot akan jalan tapi API game mungkin menolak request.
+    if (process.env.VOYAGER_API_KEY) {
+        configSession.headers['X-API-KEY'] = process.env.VOYAGER_API_KEY;
+    }
     const sessionResponse = await axios.post("https://voyager.preview.craft-world.gg/api/1/session/login", {
       token: idToken
-    }, config5);
+    }, configSession);
     
     const sessionCookie = extractSessionCookie(sessionResponse);
     if (!sessionCookie) {
-      throw new Error("Failed to extract session cookie");
+      throw new Error("Failed to extract session cookie after Firebase login.");
     }
     logger.success("Session created and cookie extracted");
 
     logger.loading("Fetching account information...");
-    const account = await getQuestProgress(sessionCookie, proxy);
+    const account = await getQuestProgress(sessionCookie, proxyString);
     logger.info(`User Profile: ${account.profile.displayName || "N/A"}`);
     logger.info(`Quest Points: ${account.questPoints}`);
     logger.info(`Loyalty Multiplier: ${account.loyaltyMultiplier}`);
     logger.info(`Rank: ${account.rank.name} (SubRank: ${account.rank.subRank})`);
     logger.info(`Next Rank: ${account.rank.nextRank} (${account.rank.nextRankRequiredPoints} points needed)`);
 
-    logger.loading("Performing daily login...");
+    logger.step("Performing daily login...");
     const dailyLoginMutation = `
       mutation CompleteQuest($questId: String!) {
         completeQuest(questId: $questId) {
@@ -653,7 +492,7 @@ async function processWallet(privateKey, index, proxy = null) {
       }
     `;
     try {
-      const config6 = createAxiosConfig(proxy, {
+      const configDailyLogin = createAxiosConfig(proxyString, {
         ...baseHeaders,
         cookie: sessionCookie,
         Referer: "https://voyager.preview.craft-world.gg/missions/daily"
@@ -662,140 +501,167 @@ async function processWallet(privateKey, index, proxy = null) {
       const dailyLoginResponse = await axios.post("https://voyager.preview.craft-world.gg/graphql", {
         query: dailyLoginMutation,
         variables: { questId: "daily_login" }
-      }, config6);
+      }, configDailyLogin);
       
       if (dailyLoginResponse.data.data.completeQuest.success) {
         logger.success("Daily login completed");
       } else {
-        logger.warn("Daily login already completed or failed");
+        logger.warn("Daily login already completed or failed (check response data for details).");
       }
     } catch (error) {
       logger.warn(`Daily login error: ${error.message}`);
     }
 
     logger.step("Starting quest claiming process...");
-    const totalClaimedQuests = await claimAllReadyQuests(sessionCookie, proxy);
+    const totalClaimedQuests = await claimAllReadyQuests(sessionCookie, proxyString);
     logger.success(`Total quests claimed: ${totalClaimedQuests}`);
 
     logger.step("Starting chest spinning process...");
-    const shopChests = await getShopChestLimits(sessionCookie, proxy);
+    const shopChests = await getShopChestLimits(sessionCookie, proxyString);
 
-    const freeChestSpins = await spinChestIfAvailable("free_uncommon_chest_1", "Daily Chest (Free)", sessionCookie, shopChests, proxy);
-
+    const freeChestSpins = await spinChestIfAvailable("free_uncommon_chest_1", "Daily Chest (Free)", sessionCookie, shopChests, proxyString);
     if (freeChestSpins > 0) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Delay jika ada spin sukses
     }
 
-    const coinChestSpins = await spinChestIfAvailable("coin_common_chest_1", "Sturdy Chest (Coin)", sessionCookie, shopChests, proxy);
+    const coinChestSpins = await spinChestIfAvailable("coin_common_chest_1", "Sturdy Chest (Coin)", sessionCookie, shopChests, proxyString);
     
     logger.success(`Chest spinning completed: ${freeChestSpins} free chests, ${coinChestSpins} coin chests`);
 
+    logger.success(`Wallet ${accountIndex} (${walletAddress}): Proses selesai.`);
     return {
-      address,
+      success: true,
+      address: walletAddress,
+      proxy: proxyString || 'N/A',
       questsClaimed: totalClaimedQuests,
-      chestsOpened: freeChestSpins + coinChestSpins,
-      proxy: proxyInfo,
-      success: true
+      chestsOpened: freeChestSpins + coinChestSpins
     };
 
   } catch (error) {
-    logger.error(`Error processing wallet ${index + 1}: ${error.message}`);
+    errorMessage = `Error processing wallet ${accountIndex} (${walletAddress}): ${error.message}`;
+    if (error.response) {
+      errorMessage += ` | API Response: ${JSON.stringify(error.response.data)}`;
+    }
+    logger.error(errorMessage);
     return {
-      address: "Unknown",
-      questsClaimed: 0,
-      chestsOpened: 0,
-      proxy: proxy ? `${proxy.host}:${proxy.port}` : 'No proxy',
       success: false,
-      error: error.message
+      address: walletAddress,
+      proxy: proxyString || 'N/A',
+      error: errorMessage,
+      questsClaimed: 0,
+      chestsOpened: 0
     };
   }
 }
 
 async function main() {
-  logger.banner();
+  // logger.banner(); // Nonaktifkan banner untuk mode 1x run di GitHub Actions
 
-  const privateKeys = Object.keys(process.env)
-    .filter(key => key.startsWith('PRIVATE_KEY_'))
-    .map(key => process.env[key]);
+  logger.info("Memulai Voyager CraftWorld Bot (1x Run)...");
+
+  // --- Ambil Private Keys dari Environment Variable ---
+  // Private keys dipisahkan koma (,) dalam satu string di GitHub Secret: PRIVATE_KEYS
+  const rawPrivateKeys = process.env.PRIVATE_KEYS;
+  const privateKeys = rawPrivateKeys ? rawPrivateKeys.split(',').map(key => key.trim()).filter(key => key !== '') : [];
+
+  // --- Ambil Data Proxies dari Environment Variable ---
+  // Proxies dipisahkan oleh newline (\n) dalam satu string di GitHub Secret: PROXIES_DATA
+  const rawProxies = process.env.PROXIES_DATA;
+  const proxies = rawProxies ? rawProxies.split('\n').map(proxy => proxy.trim()).filter(proxy => proxy !== '') : [];
 
   if (privateKeys.length === 0) {
-    logger.error("No private keys found in .env file");
-    return;
+    logger.error("PRIVATE_KEYS tidak ditemukan atau kosong di environment variables. Bot berhenti.");
+    await sendTelegramNotification("❌ *Voyager Bot Gagal!* ❌\n\n`PRIVATE_KEYS` tidak ditemukan atau kosong di GitHub Secrets. Bot tidak dapat berjalan.").catch(() => {});
+    process.exit(1); // Keluar dengan kode error
   }
-
-  const proxies = loadProxies();
 
   let workingProxies = [];
   if (proxies.length > 0) {
-    logger.step("Testing proxy connectivity...");
-    for (const proxy of proxies) {
-      if (await testProxy(proxy, 5000)) {
-        workingProxies.push(proxy);
+    logger.step("Menguji konektivitas proxy...");
+    // Uji semua proxy dan kumpulkan yang berfungsi
+    for (const proxyString of proxies) { // Gunakan proxyString langsung
+      if (await testProxy(proxyString, 5000)) { // Menggunakan timeout 5 detik untuk pengujian
+        workingProxies.push(proxyString); // Simpan string proxy yang berfungsi
       }
     }
-    logger.info(`${workingProxies.length}/${proxies.length} proxies are working`);
+    if (workingProxies.length === 0) {
+      logger.warn("Tidak ada proxy yang berfungsi. Melanjutkan tanpa proxy.");
+    } else {
+      logger.info(`${workingProxies.length} dari ${proxies.length} proxy berfungsi.`);
+    }
+  } else {
+    logger.info("Tidak ada proxy yang disediakan. Melanjutkan tanpa proxy.");
   }
 
-  while (true) {
-    const results = [];
+  const results = [];
+  // Loop melalui setiap private key untuk memproses wallet
+  for (let i = 0; i < privateKeys.length; i++) {
+    const privateKey = privateKeys[i];
+    // Rotasi proxy jika ada workingProxies
+    const currentProxyString = workingProxies.length > 0 ? workingProxies[i % workingProxies.length] : null;
+    logger.step(`Memulai pemrosesan untuk wallet ${i + 1} dari ${privateKeys.length}...`);
+    const result = await processSingleWallet(privateKey, i + 1, currentProxyString); // Kirim string proxy
+    results.push(result);
 
-    for (let i = 0; i < privateKeys.length; i++) {
-      let selectedProxy = null;
-
-      if (workingProxies.length > 0) {
-        selectedProxy = workingProxies[i % workingProxies.length];
-        logger.info(`Using proxy: ${selectedProxy.host}:${selectedProxy.port} for wallet ${i + 1}`);
-      }
-      
-      const result = await processWallet(privateKeys[i], i, selectedProxy);
-      results.push(result);
-      logger.info(`Finished processing wallet ${i + 1}`);
-      
-      if (i < privateKeys.length - 1) {
-        logger.step("Waiting 5 seconds before processing next wallet...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
+    // Tambahkan delay antar wallet jika ada lebih dari satu
+    if (i < privateKeys.length - 1) {
+      logger.step("Menunggu 5 detik sebelum memproses wallet berikutnya...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
+  }
 
-    console.log(`\n${colors.magenta}${colors.bold}--- DAILY SUMMARY ---${colors.reset}`);
-    const successful = results.filter(r => r.success);
-    const totalQuests = successful.reduce((sum, r) => sum + r.questsClaimed, 0);
-    const totalChests = successful.reduce((sum, r) => sum + r.chestsOpened, 0);
-    
-    logger.success(`Processed ${successful.length}/${results.length} wallets successfully`);
-    logger.success(`Total quests claimed: ${totalQuests}`);
-    logger.success(`Total chests opened: ${totalChests}`);
+  // --- RINGKASAN DAN NOTIFIKASI TELEGRAM ---
+  console.log(`\n${colors.magenta}${colors.bold}--- RINGKASAN EKSEKUSI BOT ---${colors.reset}`);
+  const successfulRuns = results.filter(r => r.success);
+  const totalQuests = successfulRuns.reduce((sum, r) => sum + r.questsClaimed, 0);
+  const totalChests = successfulRuns.reduce((sum, r) => sum + r.chestsOpened, 0);
 
-    results.forEach((result, index) => {
-      const status = result.success ? colors.green + "✅" : colors.red + "❌";
-      console.log(`${status} Wallet ${index + 1}: ${result.address} | Proxy: ${result.proxy} | Quests: ${result.questsClaimed} | Chests: ${result.chestsOpened}${colors.reset}`);
+  logger.success(`Processed ${successfulRuns.length}/${results.length} wallets successfully`);
+  logger.success(`Total quests claimed: ${totalQuests}`);
+  logger.success(`Total chests opened: ${totalChests}`);
+
+  results.forEach((result, index) => {
+    const status = result.success ? colors.green + "✅" : colors.red + "❌";
+    console.log(`${status} Wallet ${index + 1}: ${result.address} | Proxy: ${result.proxy} | Quests: ${result.questsClaimed} | Chests: ${result.chestsOpened}${colors.reset}`);
+  });
+
+  if (results.some(r => !r.success)) {
+    logger.warn("Wallet yang gagal:");
+    results.filter(r => !r.success).forEach((r, idx) => {
+      logger.error(`Wallet ${results.indexOf(r) + 1}: ${r.error}`);
     });
-    
-    if (results.some(r => !r.success)) {
-      logger.warn("Failed wallets:");
-      results.filter(r => !r.success).forEach((r, idx) => {
-        logger.error(`Wallet ${results.indexOf(r) + 1}: ${r.error}`);
-      });
-    }
-    
-    console.log(`\n${colors.cyan}[⏳] All wallets processed. Waiting for next daily reset...${colors.reset}\n`);
-
-    await startCountdown();
-
-    if (proxies.length > 0) {
-      logger.step("Re-testing proxy connectivity for next cycle...");
-      workingProxies = [];
-      for (const proxy of proxies) {
-        if (await testProxy(proxy, 3000)) {
-          workingProxies.push(proxy);
-        }
-      }
-      logger.info(`${workingProxies.length}/${proxies.length} proxies ready for next cycle`);
-    }
   }
+
+  // Notifikasi Telegram
+  let telegramSummary = `*Voyager Bot Run Selesai!* ✅\n\n`;
+  telegramSummary += `*Ringkasan:*\n`;
+  telegramSummary += `Wallet berhasil diproses: ${successfulRuns.length}/${results.length}\n`;
+  telegramSummary += `Total quests diklaim: ${totalQuests}\n`;
+  telegramSummary += `Total chests dibuka: ${totalChests}\n\n`;
+
+  if (results.some(r => !r.success)) {
+    telegramSummary += `*Wallet yang gagal:*\n`;
+    results.filter(r => !r.success).forEach((r, idx) => {
+      telegramSummary += `• Wallet ${results.indexOf(r) + 1}: \`${r.error}\`\n`;
+    });
+  } else {
+    telegramSummary += `Semua wallet berhasil diproses tanpa kendala! ✨\n`;
+  }
+
+  // Batasi panjang pesan Telegram jika terlalu panjang
+  if (telegramSummary.length > 4096) {
+    telegramSummary = telegramSummary.substring(0, 4000) + "\n\n...(Pesan dipotong karena terlalu panjang)";
+  }
+
+  await sendTelegramNotification(telegramSummary);
+
+  console.log(`\n${colors.cyan}[✓] Semua wallet selesai diproses. Skrip akan keluar.${colors.reset}\n`);
 }
 
+// Panggil fungsi utama
 main().catch(error => {
-  logger.error(`Main execution error: ${error.message}`);
-  process.exit(1);
+  logger.error(`Terjadi kesalahan fatal pada bot: ${error.message}`);
+  // Kirim notifikasi error fatal ke Telegram
+  sendTelegramNotification(`⚠️ *Voyager Bot Gagal Total!* ⚠️\n\nError Fatal: \`${error.message}\``).catch(() => {});
+  process.exit(1); // Keluar dengan kode error
 });
